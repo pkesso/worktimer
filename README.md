@@ -15,10 +15,9 @@ Configure it via env vars, if needed:
     [[block]]
     block = "custom"
     command = "/usr/local/bin/worktimer.sh"
-    cycle = ["/usr/bin/kill -s SIGUSR1 $(cat /run/user/$UID/worktimer.pid)"]
     persistent = true
     [[block.click]]
-    button = "left"
-    action = "cycle"
+    cmd = "/usr/bin/kill -s SIGUSR1 $(cat /run/user/$UID/worktimer.pid)"
+    button = "right"
 
 Don't forget to set correct path to worktimer.sh and worktimer.pid
