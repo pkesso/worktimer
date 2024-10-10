@@ -5,6 +5,9 @@
 #set -e
 #set -x
 
+# TODO re-read state after pause, not after start
+# TODO colored panel
+
 # start paused
 PAUSE=1
 
@@ -77,7 +80,7 @@ main() {
             if [ $PAUSE -eq 0 ]
             then
                 ((WORKSECONDS--))
-                date -d@$WORKSECONDS -u +%H:%M:%S
+                date -d@$WORKSECONDS -u +%H:%M
                 echo "$(date "+%s") $WORKSECONDS" > "$STATEFILE"
             else
                 echo '[paused]'
