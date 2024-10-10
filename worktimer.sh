@@ -5,8 +5,8 @@
 #set -e
 #set -x
 
-# TODO re-read state after pause, not after start
-# TODO colored panel
+# TODO переход счетчика через ноль - сбрасывает на 23:59, а должен показывать счетчик переработки (с минусом?)
+# TODO colored panel?
 
 # start paused
 PAUSE=1
@@ -14,7 +14,7 @@ PAUSE=1
 # 
 config() {
     DEFAULT_WORKSECONDS="$(( 8*3600 ))"    # 8h
-    DEFAULT_STATEFILE="/run/user/$UID/worktimer.state"
+    DEFAULT_STATEFILE="$HOME/.worktimer.state"
     DEFAULT_PIDFILE="/run/user/$UID/worktimer.pid"
     
     if [ -z "$WORKTIMER_WORKSECONDS" ]
@@ -63,6 +63,10 @@ pause-unpause() {
     # send SIGUSR1 to the process to pause timer
     # kill -s SIGUSR1 $(cat $PIDFILE)
     ((PAUSE ^= 1 ))
+    if [ $PAUSE -eq 0 ]
+    then
+        try-resume
+    fi
 }
 
 # cleanup and exit
@@ -77,10 +81,18 @@ main() {
     while true
         do
             sleep 1
-            if [ $PAUSE -eq 0 ]
+            if [ "$PAUSE" -eq 0 ]
             then
                 ((WORKSECONDS--))
-                date -d@$WORKSECONDS -u +%H:%M
+                if [ "$WORKSECONDS" -lt 0 ]
+                then
+                    # overtime mode
+                    #echo "-$(date -d@$((WORKSECONDS * -1)) -u +%H:%M:%S)"
+                    echo "-$(date -d@$((WORKSECONDS * -1)) -u +%H:%M)"
+                else
+                    #date -d@$WORKSECONDS -u +%H:%M:%S
+                    date -d@$WORKSECONDS -u +%H:%M
+                fi
                 echo "$(date "+%s") $WORKSECONDS" > "$STATEFILE"
             else
                 echo '[paused]'
@@ -89,7 +101,6 @@ main() {
 }
 
 config
-try-resume
 trap pause-unpause SIGUSR1
 trap cleanup SIGINT
 main
