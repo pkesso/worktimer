@@ -4,8 +4,10 @@
 
 #set -e
 #set -x
+#DEBUG=true
 
-# TODO переход счетчика через ноль - сбрасывает на 23:59, а должен показывать счетчик переработки (с минусом?)
+# TODO fix reset counter on date change
+# TODO human-readable date in statefile?
 # TODO colored panel?
 
 # start paused
@@ -13,6 +15,7 @@ PAUSE=1
 
 # 
 config() {
+    if [ "$DEBUG" ]; then echo 'Configuring'; fi
     DEFAULT_WORKSECONDS="$(( 8*3600 ))"    # 8h
     DEFAULT_STATEFILE="$HOME/.worktimer.state"
     DEFAULT_PIDFILE="/run/user/$UID/worktimer.pid"
@@ -41,18 +44,24 @@ config() {
 
 # try to use previous data from state file
 try-resume() {
+    if [ "$DEBUG" ]; then echo 'Trying to resume from state file'; fi
     if [ -f "$STATEFILE" ]
     then
         STATE=$(cat "$STATEFILE") || return 0
         STATETIME=$(echo "$STATE" | cut -f 1 -d ' ') || return 0
         STATEWORKSECONDS=$(echo "$STATE" | cut -f 2 -d ' ') || return 0
         # echo "Statetime $STATETIME Stateworkseconds $STATEWORKSECONDS"
+        if [ "$DEBUG" ]
+            then
+            echo "State in file found: STATETIME $(date -d @"$STATETIME" +%Y/%m/%d_%H-%M-%S) STATEWORKSECONDS $(date "+%s") $WORKSECONDS"
+        fi
         if [ "$(date -d @"$STATETIME" +%Y%m%d)" == "$(date +%Y%m%d)"  ]
         then
             # echo 'Same day, resuming timer'
+            if [ "$DEBUG" ]; then echo 'Same day, resuming counter'; fi
             WORKSECONDS=$STATEWORKSECONDS
         else
-            # echo 'New day, resetting timer'
+            if [ "$DEBUG" ]; then echo 'New day, resetting counter'; fi
             return 0
         fi
     fi
@@ -65,18 +74,23 @@ pause-unpause() {
     ((PAUSE ^= 1 ))
     if [ $PAUSE -eq 0 ]
     then
+        if [ "$DEBUG" ]; then echo 'Unpausing'; fi
         try-resume
+    else
+        if [ "$DEBUG" ]; then echo 'Pausing'; fi
     fi
 }
 
 # cleanup and exit
 cleanup() {
+    if [ "$DEBUG" ]; then echo 'Cleaning up'; fi
     rm -f "$PIDFILE"
     exit 0
 }
 
 # main loop
 main() {
+    if [ "$DEBUG" ]; then echo 'Entering main loop'; fi
     echo "$$" > "$PIDFILE"
     while true
         do
@@ -87,11 +101,22 @@ main() {
                 if [ "$WORKSECONDS" -lt 0 ]
                 then
                     # overtime mode
-                    #echo "-$(date -d@$((WORKSECONDS * -1)) -u +%H:%M:%S)"
-                    echo "-$(date -d@$((WORKSECONDS * -1)) -u +%H:%M)"
+                    if [ "$DEBUG" ]
+                    then
+                        echo 'Overtime mode'
+                        echo "-$(date -d@$((WORKSECONDS * -1)) -u +%H:%M:%S)"
+                    else
+                        echo "-$(date -d@$((WORKSECONDS * -1)) -u +%H:%M)"
+                    fi
                 else
-                    #date -d@$WORKSECONDS -u +%H:%M:%S
-                    date -d@$WORKSECONDS -u +%H:%M
+                    # normal mode
+                    if [ "$DEBUG" ]
+                    then
+                        echo 'Normal mode'
+                        date -d@$WORKSECONDS -u +%H:%M:%S
+                    else
+                        date -d@$WORKSECONDS -u +%H:%M
+                    fi
                 fi
                 echo "$(date "+%s") $WORKSECONDS" > "$STATEFILE"
             else
@@ -100,6 +125,7 @@ main() {
         done
 }
 
+if [ "$DEBUG" ]; then echo 'DEBUG is on'; fi
 config
 trap pause-unpause SIGUSR1
 trap cleanup SIGINT
